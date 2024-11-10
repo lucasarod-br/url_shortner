@@ -3,12 +3,13 @@ import express from 'express';
 
 const app = express();
 const port = 8000;
-const address = 'http://localhost:8000/';
+const address = process.env.BASE_URL || `http://localhost:${port}/`;
 
 const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: ':memory:'
-});
+    dialect: 'sqlite',
+    storage: process.env.DB_PATH || 'database.sqlite'
+  });
+
 const URLS = sequelize.define('URLS', {
     url: {
         type: DataTypes.STRING,
@@ -38,17 +39,28 @@ app.post('/shorten-url', async (req, res) => {
 
     const shorted = generateShortCode(Math.floor(Math.random() * 6) + 5);
     try {
-        const result = await URLS.create({ url, shorted, expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
+        const result = await URLS.create({ url, shorted , expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
         res.json({url: `${ address + result.shorted }`});
     } catch (error) {
         res.status(500).json({ error: 'Ocorreu um erro ao encurtar a URL' });
     }
 });
 
-app.get('/:short', (req, res) => {
-    res.redirect('https://www.google.com');
+app.get('/:short', async (req, res) => {
+    const { short } = req.params;
+    try {
+        const result = await URLS.findOne({ where: { shorted: short } });
+        if (!result) {
+            return res.status(404).json({ error: 'URL não encontrada' });
+        }
+        if (result.expiresAt < new Date()) {
+            return res.status(404).json({ error: 'URL expirada' });
+        }
+        res.redirect(result.url);
+    } catch (error) {
+        res.status(500).json({ error: 'Ocorreu um erro ao buscar a URL' });
+    }
 });
 
 app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
 });
