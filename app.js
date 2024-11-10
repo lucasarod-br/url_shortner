@@ -3,17 +3,26 @@ import express from 'express';
 
 const app = express();
 const port = 8000;
-const address = 'http://localhost:8000';
-
+const address = 'http://localhost:8000/';
 
 const sequelize = new Sequelize({
   dialect: 'sqlite',
   storage: ':memory:'
 });
 const URLS = sequelize.define('URLS', {
-  url: DataTypes.STRING,
-  shorted: DataTypes.STRING,
-  expiresAt: DataTypes.DATE
+    url: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    shorted: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
+    expiresAt: {
+        type: DataTypes.DATE,
+        allowNull: false
+    }
 });
 
 sequelize.sync();
@@ -28,12 +37,12 @@ app.post('/shorten-url', async (req, res) => {
     };
 
     const shorted = generateShortCode(Math.floor(Math.random() * 6) + 5);
-    const result = await URLS.create({ url, shorted, expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
-    res.json({url: `${ address }/${ result.shorted }`});
-});
-app.post('/shorten-url', (req, res) => {
-    url = req.body.url;
-    res.send('Shortened URL: http://localhost:8000/abc123');
+    try {
+        const result = await URLS.create({ url, shorted, expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
+        res.json({url: `${ address + result.shorted }`});
+    } catch (error) {
+        res.status(500).json({ error: 'Ocorreu um erro ao encurtar a URL' });
+    }
 });
 
 app.get('/:short', (req, res) => {
